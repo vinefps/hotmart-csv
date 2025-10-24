@@ -15,24 +15,37 @@ const Vendas = () => {
   const [vendaSelecionada, setVendaSelecionada] = useState(null);
   const [arquivo, setArquivo] = useState(null);
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
+  const [filtroStatus, setFiltroStatus] = useState('todos'); // ← NOVO: filtro de status
   
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
     telefone: '',
+    produto: '', // ← NOVO: campo produto
     tipo_pagamento: '',
     faturamento_liquido: '',
     origem_checkout: ''
   });
 
+  // ← ATUALIZADO: adicionar filtroStatus como dependência
   useEffect(() => {
     carregarVendas();
-  }, [paginaAtual, busca]);
+  }, [paginaAtual, busca, filtroStatus]);
 
+  // ← ATUALIZADO: carregar vendas baseado no filtro
   const carregarVendas = async () => {
     try {
       setCarregando(true);
-      const response = await vendasService.listar(paginaAtual, 20, busca);
+      let response;
+      
+      if (filtroStatus === 'ativas') {
+        response = await vendasService.listarAtivas(paginaAtual, 20, busca);
+      } else if (filtroStatus === 'canceladas') {
+        response = await vendasService.listarCancelamentos(paginaAtual, 20, busca);
+      } else {
+        response = await vendasService.listar(paginaAtual, 20, busca);
+      }
+      
       setVendas(response.data);
       setTotalPaginas(response.pagination.totalPages);
     } catch (error) {
@@ -54,6 +67,7 @@ const Vendas = () => {
         nome: venda.nome || '',
         email: venda.email || '',
         telefone: venda.telefone || '',
+        produto: venda.produto || '', // ← NOVO: incluir produto
         tipo_pagamento: venda.tipo_pagamento || '',
         faturamento_liquido: venda.faturamento_liquido || '',
         origem_checkout: venda.origem_checkout || ''
@@ -64,6 +78,7 @@ const Vendas = () => {
         nome: '',
         email: '',
         telefone: '',
+        produto: '', // ← NOVO: resetar produto
         tipo_pagamento: '',
         faturamento_liquido: '',
         origem_checkout: ''
@@ -102,6 +117,20 @@ const Vendas = () => {
     }
   };
 
+  const handleDeletar = async (id) => {
+    if (!window.confirm('Tem certeza que deseja cancelar esta venda?')) {
+      return;
+    }
+
+    try {
+      await vendasService.deletar(id);
+      mostrarMensagem('sucesso', 'Venda cancelada com sucesso!');
+      carregarVendas();
+    } catch (error) {
+      mostrarMensagem('erro', error.response?.data?.message || 'Erro ao cancelar venda');
+    }
+  };
+
   const handleUpload = async (e) => {
     e.preventDefault();
 
@@ -132,6 +161,24 @@ const Vendas = () => {
     }).format(valor);
   };
 
+  // ← NOVO: função para renderizar badge de status
+  const renderStatusBadge = (status) => {
+    const statusConfig = {
+      'aprovado': { bg: 'bg-green-100', text: 'text-green-800', label: 'Aprovado' },
+      'cancelado': { bg: 'bg-red-100', text: 'text-red-800', label: 'Cancelado' },
+      'reembolso': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Reembolso' },
+      'chargeback': { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Chargeback' }
+    };
+
+    const config = statusConfig[status] || statusConfig['aprovado'];
+
+    return (
+      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${config.bg} ${config.text}`}>
+        {config.label}
+      </span>
+    );
+  };
+
   if (carregando && vendas.length === 0) {
     return <Loading />;
   }
@@ -150,24 +197,78 @@ const Vendas = () => {
           </div>
         )}
 
-        {/* Barra de Pesquisa e Botões */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-3">
+        {/* Barra de Pesquisa, Filtros e Botões */}
+        <div className="mb-6 flex flex-col gap-3">
           <input
             type="text"
-            placeholder="Buscar por nome, email, tipo de pagamento ou origem..."
+            placeholder="Buscar por nome, email, produto, tipo de pagamento ou origem..."
             value={busca}
             onChange={(e) => {
               setBusca(e.target.value);
               setPaginaAtual(1);
             }}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <button
-            onClick={() => setModalUploadAberto(true)}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            📤 Upload CSV
-          </button>
+          
+          {/* ← NOVO: Botões de filtro de status */}
+          <div className="flex flex-wrap gap-3">
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setFiltroStatus('todos');
+                  setPaginaAtual(1);
+                }}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  filtroStatus === 'todos'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                📊 Todas
+              </button>
+              <button
+                onClick={() => {
+                  setFiltroStatus('ativas');
+                  setPaginaAtual(1);
+                }}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  filtroStatus === 'ativas'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                ✅ Ativas
+              </button>
+              <button
+                onClick={() => {
+                  setFiltroStatus('canceladas');
+                  setPaginaAtual(1);
+                }}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  filtroStatus === 'canceladas'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                ❌ Canceladas
+              </button>
+            </div>
+
+            <div className="flex gap-2 ml-auto">
+              <button
+                onClick={() => abrirModal()}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                ➕ Nova Venda
+              </button>
+              <button
+                onClick={() => setModalUploadAberto(true)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                📤 Upload CSV
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Tabela de Vendas */}
@@ -189,9 +290,11 @@ const Vendas = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Nome</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Email</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Telefone</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Produto</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tipo Pagamento</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Faturamento</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Origem</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Ações</th>
                     </tr>
                   </thead>
@@ -201,18 +304,31 @@ const Vendas = () => {
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{venda.nome}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{venda.email || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{venda.telefone || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{venda.produto || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{venda.tipo_pagamento || '-'}</td>
                         <td className="px-6 py-4 text-sm font-semibold text-green-600">
                           {formatarMoeda(venda.faturamento_liquido)}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">{venda.origem_checkout || '-'}</td>
                         <td className="px-6 py-4 text-sm">
-                          <button
-                            onClick={() => abrirModal(venda)}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            ✏️ Editar
-                          </button>
+                          {renderStatusBadge(venda.status)}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => abrirModal(venda)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button
+                              onClick={() => handleDeletar(venda.id)}
+                              className="text-red-600 hover:text-red-800 font-medium"
+                              disabled={venda.status !== 'aprovado'}
+                            >
+                              🗑️ Cancelar
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -222,47 +338,49 @@ const Vendas = () => {
 
               {/* Paginação */}
               {totalPaginas > 1 && (
-                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                  <div className="flex-1 flex justify-between sm:hidden">
-                    <button
-                      onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
-                      disabled={paginaAtual === 1}
-                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Anterior
-                    </button>
-                    <button
-                      onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
-                      disabled={paginaAtual === totalPaginas}
-                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Próximo
-                    </button>
-                  </div>
-                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        Página <span className="font-medium">{paginaAtual}</span> de{' '}
-                        <span className="font-medium">{totalPaginas}</span>
-                      </p>
+                <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 flex justify-between sm:hidden">
+                      <button
+                        onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+                        disabled={paginaAtual === 1}
+                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Anterior
+                      </button>
+                      <button
+                        onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+                        disabled={paginaAtual === totalPaginas}
+                        className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Próximo
+                      </button>
                     </div>
-                    <div>
-                      <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                        <button
-                          onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
-                          disabled={paginaAtual === 1}
-                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          ‹
-                        </button>
-                        <button
-                          onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
-                          disabled={paginaAtual === totalPaginas}
-                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          ›
-                        </button>
-                      </nav>
+                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm text-gray-700">
+                          Página <span className="font-medium">{paginaAtual}</span> de{' '}
+                          <span className="font-medium">{totalPaginas}</span>
+                        </p>
+                      </div>
+                      <div>
+                        <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                          <button
+                            onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+                            disabled={paginaAtual === 1}
+                            className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            ‹
+                          </button>
+                          <button
+                            onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+                            disabled={paginaAtual === totalPaginas}
+                            className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            ›
+                          </button>
+                        </nav>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -316,6 +434,21 @@ const Vendas = () => {
               value={formData.telefone}
               onChange={handleChange}
               placeholder="(11) 99999-9999"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* ← NOVO: Campo Produto */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Produto
+            </label>
+            <input
+              type="text"
+              name="produto"
+              value={formData.produto}
+              onChange={handleChange}
+              placeholder="Ex: Curso de Marketing Digital"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -411,6 +544,7 @@ const Vendas = () => {
               <li>Email</li>
               <li>DDD</li>
               <li>Telefone</li>
+              <li>Produto</li>
               <li>Tipo de Pagamento</li>
               <li>Faturamento líquido</li>
               <li>Origem de Checkout</li>

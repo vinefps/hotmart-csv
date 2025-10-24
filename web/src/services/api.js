@@ -37,7 +37,9 @@ api.interceptors.response.use(
   }
 );
 
-// Serviços de autenticação
+// ========================================
+// SERVIÇOS DE AUTENTICAÇÃO
+// ========================================
 export const authService = {
   login: async (email, senha) => {
     const response = await api.post('/auth/login', { email, senha });
@@ -49,30 +51,56 @@ export const authService = {
   }
 };
 
-// Serviços de vendas
+// ========================================
+// SERVIÇOS DE VENDAS
+// ========================================
 export const vendasService = {
-  listar: async (page = 1, limit = 20, search = '') => {
-    const response = await api.get('/vendas', {
+  // ✅ CORRIGIDO: Adicionar suporte para filtro de status
+  listar: async (page = 1, limit = 20, search = '', status = null) => {
+    const params = { page, limit, search };
+    if (status) params.status = status;
+    
+    const response = await api.get('/vendas', { params });
+    return response.data;
+  },
+
+  // ✅ NOVO: Listar apenas vendas ativas (aprovadas)
+  listarAtivas: async (page = 1, limit = 20, search = '') => {
+    const response = await api.get('/vendas/ativas', {
       params: { page, limit, search }
     });
     return response.data;
   },
+
+  // ✅ NOVO: Listar apenas cancelamentos (cancelado, reembolso, chargeback)
+  listarCancelamentos: async (page = 1, limit = 20, search = '') => {
+    const response = await api.get('/vendas/cancelamentos', {
+      params: { page, limit, search }
+    });
+    return response.data;
+  },
+
   buscarPorId: async (id) => {
     const response = await api.get(`/vendas/${id}`);
     return response.data;
   },
+
   criar: async (dados) => {
     const response = await api.post('/vendas', dados);
     return response.data;
   },
+
   atualizar: async (id, dados) => {
     const response = await api.put(`/vendas/${id}`, dados);
     return response.data;
   },
+
+  // Soft delete - marca como cancelado
   deletar: async (id) => {
     const response = await api.delete(`/vendas/${id}`);
     return response.data;
   },
+
   uploadCSV: async (arquivo) => {
     const formData = new FormData();
     formData.append('file', arquivo);
@@ -83,13 +111,31 @@ export const vendasService = {
     });
     return response.data;
   },
+
+  // ✅ CORRIGIDO: Endpoint correto de estatísticas gerais
   obterEstatisticas: async () => {
-    const response = await api.get('/vendas/estatisticas');
+    const response = await api.get('/vendas/stats/geral');
+    return response.data;
+  },
+
+  // ✅ NOVO: Estatísticas por período (últimos X dias)
+  obterEstatisticasPeriodo: async (dias = 30) => {
+    const response = await api.get('/vendas/stats/periodo', {
+      params: { dias }
+    });
+    return response.data;
+  },
+
+  // ✅ NOVO: Obter formato esperado do CSV
+  obterFormatoCSV: async () => {
+    const response = await api.get('/vendas/upload/formato');
     return response.data;
   }
 };
 
-// Serviços de admin
+// ========================================
+// SERVIÇOS DE ADMIN
+// ========================================
 export const adminService = {
   deletarTodos: async () => {
     const response = await api.delete('/admin/deletar-todos');
