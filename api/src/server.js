@@ -21,7 +21,6 @@ const vendasRoutes = require('./routes/vendasRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const hotmartRoutes = require('./routes/hotmartRoutes');
 
-// Usar rotas
 app.use('/api/auth', authRoutes);
 app.use('/api/vendas', vendasRoutes);
 app.use('/api/admin', adminRoutes);
@@ -45,8 +44,6 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`📤 Upload CSV: POST /api/vendas/upload`);
-  console.log(`🔔 Webhook Hotmart: POST /api/hotmart/webhook`);
 });
 
 module.exports = app;
