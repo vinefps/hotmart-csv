@@ -39,16 +39,19 @@ const validarAssinaturaHotmart = (req) => {
   }
 
   try {
-    // Gerar hash HMAC do body
-    const body = JSON.stringify(req.body);
+    // CRÍTICO: Usar o body RAW (Buffer) para calcular o HMAC
+    // A Hotmart calcula o HMAC no body RAW, não no JSON parseado
+    const rawBody = req.body; // Express.raw() entrega um Buffer
+
     const expectedSignature = crypto
       .createHmac('sha256', secret)
-      .update(body)
+      .update(rawBody)
       .digest('hex');
 
     console.log('🔐 Validando assinatura HMAC...');
-    console.log('   Signature recebida:', signatureHeader.substring(0, 20) + '...');
-    console.log('   Signature esperada:', expectedSignature.substring(0, 20) + '...');
+    console.log('   Signature recebida:', signatureHeader);
+    console.log('   Signature esperada:', expectedSignature);
+    console.log('   Body length:', rawBody.length, 'bytes');
 
     // Comparação segura
     const isValid = crypto.timingSafeEqual(
@@ -60,11 +63,13 @@ const validarAssinaturaHotmart = (req) => {
       console.log('✅ Assinatura válida!');
     } else {
       console.error('❌ Assinatura inválida! Secret key pode estar incorreto.');
+      console.error('   Verifique se o HOTMART_SECRET_KEY no .env está correto');
     }
 
     return isValid;
   } catch (error) {
     console.error('❌ Erro ao validar assinatura:', error.message);
+    console.error('   Stack:', error.stack);
     return false;
   }
 };
@@ -320,15 +325,17 @@ exports.receberWebhook = async (req, res) => {
     // 1. Validar assinatura HMAC
     if (!validarAssinaturaHotmart(req)) {
       console.error('❌ ASSINATURA HMAC INVÁLIDA');
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        error: 'Assinatura inválida' 
+        error: 'Assinatura inválida'
       });
     }
 
     console.log('✅ Assinatura HMAC validada com sucesso');
 
-    const { event, data } = req.body;
+    // 2. Parsear o body (que está como Buffer do express.raw())
+    const bodyParsed = JSON.parse(req.body.toString('utf8'));
+    const { event, data } = bodyParsed;
     console.log('📦 Tipo de Evento:', event);
     console.log('📦 Payload:', JSON.stringify(data, null, 2));
 
