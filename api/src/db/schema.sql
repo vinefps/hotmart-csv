@@ -26,9 +26,6 @@ CREATE TABLE vendas (
 );
 
 
-ALTER TABLE vendas 
-ADD COLUMN IF NOT EXISTS hotmart_transaction_id VARCHAR(255) UNIQUE;
-
 -- Índices para melhorar performance
 CREATE INDEX idx_nome ON vendas(nome);
 CREATE INDEX idx_email ON vendas(email);
@@ -39,8 +36,11 @@ CREATE INDEX idx_origem ON vendas(origem_checkout); -- ✅ ÍNDICE ADICIONADO
 CREATE INDEX IF NOT EXISTS idx_hotmart_transaction 
 ON vendas(hotmart_transaction_id);
 
+ALTER TABLE vendas 
+ADD COLUMN IF NOT EXISTS hotmart_transaction_id VARCHAR(255) UNIQUE;
+
 -- Inserir usuário padrão (senha: admin123)
 INSERT INTO usuarios (nome, email, senha) 
-VALUES ('Admin', 'admin@vendas.com', '$2a$10$YourHashedPasswordHere');
+VALUES ('Admin', 'admin@vendas.com', 'admin123');
 
 -- ✅ Pronto! Agora a tabela tem a coluna telefone
