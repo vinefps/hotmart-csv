@@ -7,35 +7,69 @@ const pool = require('../db/connection');
  */
 const validarAssinaturaHotmart = (req) => {
   const secret = process.env.HOTMART_SECRET_KEY;
-  
-  // Em desenvolvimento, permite sem validação
-  if (process.env.NODE_ENV === 'development' && !secret) {
-    console.warn('⚠️ HOTMART_SECRET_KEY não configurado - modo DEV');
+
+  // Detectar secret de exemplo/placeholder
+  const isPlaceholder = !secret ||
+    secret.includes('abc123') ||
+    secret.includes('...') ||
+    secret === 'seu_secret_aqui';
+
+  // Em desenvolvimento OU com secret de exemplo, permite sem validação
+  if (process.env.NODE_ENV === 'development' && isPlaceholder) {
+    console.warn('⚠️ ========================================');
+    console.warn('⚠️ MODO DESENVOLVIMENTO - VALIDAÇÃO DESATIVADA');
+    console.warn('⚠️ HOTMART_SECRET_KEY não configurado ou é placeholder');
+    console.warn('⚠️ Em produção, configure o secret correto!');
+    console.warn('⚠️ ========================================');
     return true;
   }
 
   // Hotmart envia a assinatura no header
   const signatureHeader = req.headers['x-hotmart-hottok'];
-  
-  if (!signatureHeader || !secret) {
+
+  if (!signatureHeader) {
+    console.error('❌ Header x-hotmart-hottok não encontrado');
+    return false;
+  }
+
+  if (!secret || isPlaceholder) {
+    console.error('❌ HOTMART_SECRET_KEY não configurado corretamente no .env');
+    console.error('   Configure o secret real da Hotmart para validação funcionar');
     return false;
   }
 
   try {
-    // Gerar hash HMAC do body
-    const body = JSON.stringify(req.body);
+    // CRÍTICO: Usar o body RAW (Buffer) para calcular o HMAC
+    // A Hotmart calcula o HMAC no body RAW, não no JSON parseado
+    const rawBody = req.body; // Express.raw() entrega um Buffer
+
     const expectedSignature = crypto
       .createHmac('sha256', secret)
-      .update(body)
+      .update(rawBody)
       .digest('hex');
-    
+
+    console.log('🔐 Validando assinatura HMAC...');
+    console.log('   Signature recebida:', signatureHeader);
+    console.log('   Signature esperada:', expectedSignature);
+    console.log('   Body length:', rawBody.length, 'bytes');
+
     // Comparação segura
-    return crypto.timingSafeEqual(
+    const isValid = crypto.timingSafeEqual(
       Buffer.from(signatureHeader),
       Buffer.from(expectedSignature)
     );
+
+    if (isValid) {
+      console.log('✅ Assinatura válida!');
+    } else {
+      console.error('❌ Assinatura inválida! Secret key pode estar incorreto.');
+      console.error('   Verifique se o HOTMART_SECRET_KEY no .env está correto');
+    }
+
+    return isValid;
   } catch (error) {
-    console.error('Erro ao validar assinatura:', error);
+    console.error('❌ Erro ao validar assinatura:', error.message);
+    console.error('   Stack:', error.stack);
     return false;
   }
 };
@@ -45,12 +79,12 @@ const validarAssinaturaHotmart = (req) => {
  */
 const vendaJaExiste = async (transactionId) => {
   if (!transactionId) return false;
-  
+
   const resultado = await pool.query(
     'SELECT id FROM vendas WHERE hotmart_transaction_id = $1 LIMIT 1',
     [transactionId]
   );
-  
+
   return resultado.rows.length > 0;
 };
 
@@ -59,12 +93,12 @@ const vendaJaExiste = async (transactionId) => {
  */
 const buscarVendaPorTransaction = async (transactionId) => {
   if (!transactionId) return null;
-  
+
   const resultado = await pool.query(
     'SELECT * FROM vendas WHERE hotmart_transaction_id = $1 LIMIT 1',
     [transactionId]
   );
-  
+
   return resultado.rows.length > 0 ? resultado.rows[0] : null;
 };
 
@@ -75,8 +109,8 @@ const extrairDadosComprador = (data) => {
   return {
     nome: data.buyer?.name || 'Não informado',
     email: data.buyer?.email || null,
-    telefone: data.buyer?.phone_number || 
-              data.buyer?.phone || null
+    telefone: data.buyer?.phone_number ||
+      data.buyer?.phone || null
   };
 };
 
@@ -85,13 +119,13 @@ const extrairDadosComprador = (data) => {
  */
 const extrairDadosProduto = (data) => {
   return {
-    produto: data.product?.name || 
-            data.purchase?.offer?.name || 
-            data.product?.ucode ||
-            'Produto Hotmart',
-    origem: data.product?.name || 
-           data.purchase?.offer?.name || 
-           'Hotmart'
+    produto: data.product?.name ||
+      data.purchase?.offer?.name ||
+      data.product?.ucode ||
+      'Produto Hotmart',
+    origem: data.product?.name ||
+      data.purchase?.offer?.name ||
+      'Hotmart'
   };
 };
 
@@ -99,12 +133,12 @@ const extrairDadosProduto = (data) => {
  * Extrai dados de pagamento
  */
 const extrairDadosPagamento = (data) => {
-  const tipoPagamento = data.purchase?.payment?.type || 
-                       data.purchase?.payment_type || 
-                       'Não informado';
-  
+  const tipoPagamento = data.purchase?.payment?.type ||
+    data.purchase?.payment_type ||
+    'Não informado';
+
   const faturamento = parseFloat(
-    data.purchase?.price?.value || 
+    data.purchase?.price?.value ||
     data.purchase?.commissioned_amount ||
     data.purchase?.price ||
     0
@@ -121,17 +155,17 @@ const extrairDadosPagamento = (data) => {
  */
 const processarVendaAprovada = async (data) => {
   const transactionId = data.purchase?.transaction || null;
-  
+
   console.log('💰 Processando VENDA APROVADA');
   console.log('   Transaction ID:', transactionId);
 
   // Verificar duplicata
   if (transactionId && await vendaJaExiste(transactionId)) {
     console.log('⚠️ Venda duplicada - ignorando');
-    return { 
-      success: true, 
+    return {
+      success: true,
       message: 'Venda já processada',
-      duplicated: true 
+      duplicated: true
     };
   }
 
@@ -180,7 +214,7 @@ const processarVendaAprovada = async (data) => {
  */
 const processarCancelamento = async (data, tipoEvento) => {
   const transactionId = data.purchase?.transaction || null;
-  
+
   console.log(`🚫 Processando ${tipoEvento.toUpperCase()}`);
   console.log('   Transaction ID:', transactionId);
 
@@ -197,7 +231,7 @@ const processarCancelamento = async (data, tipoEvento) => {
 
   if (!vendaExistente) {
     console.log('⚠️ Venda não encontrada para cancelar - criando registro de cancelamento');
-    
+
     // Criar registro de cancelamento mesmo sem venda prévia
     const comprador = extrairDadosComprador(data);
     const produto = extrairDadosProduto(data);
@@ -291,15 +325,17 @@ exports.receberWebhook = async (req, res) => {
     // 1. Validar assinatura HMAC
     if (!validarAssinaturaHotmart(req)) {
       console.error('❌ ASSINATURA HMAC INVÁLIDA');
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        error: 'Assinatura inválida' 
+        error: 'Assinatura inválida'
       });
     }
 
     console.log('✅ Assinatura HMAC validada com sucesso');
 
-    const { event, data } = req.body;
+    // 2. Parsear o body (que está como Buffer do express.raw())
+    const bodyParsed = JSON.parse(req.body.toString('utf8'));
+    const { event, data } = bodyParsed;
     console.log('📦 Tipo de Evento:', event);
     console.log('📦 Payload:', JSON.stringify(data, null, 2));
 
@@ -339,9 +375,9 @@ exports.receberWebhook = async (req, res) => {
       // Outros eventos não processados
       default:
         console.log(`ℹ️ Evento ${event} recebido mas não processado`);
-        resultado = { 
-          success: true, 
-          message: `Evento ${event} recebido mas não requer processamento` 
+        resultado = {
+          success: true,
+          message: `Evento ${event} recebido mas não requer processamento`
         };
     }
 
@@ -355,10 +391,10 @@ exports.receberWebhook = async (req, res) => {
     console.error('❌ ERRO AO PROCESSAR WEBHOOK:', error);
     console.error('Stack:', error.stack);
     console.log('🔔 ========================================\n');
-    
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 };
@@ -368,7 +404,7 @@ exports.receberWebhook = async (req, res) => {
  */
 exports.testarWebhook = async (req, res) => {
   console.log('🧪 Teste de webhook iniciado');
-  
+
   // Exemplo de payload de venda
   const payloadVendaTeste = {
     event: 'PURCHASE_COMPLETE',
@@ -398,9 +434,9 @@ exports.testarWebhook = async (req, res) => {
     req.body = payloadVendaTeste;
     await exports.receberWebhook(req, res);
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 };
