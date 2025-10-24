@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const pool = require('./db/connection');
 
 const app = express();
 
@@ -145,14 +147,58 @@ app.use((req, res) => {
   });
 });
 
+// ===== VERIFICAÇÃO E CORREÇÃO AUTOMÁTICA DO ADMIN =====
+async function verificarECorrigirAdmin() {
+  try {
+    console.log('🔐 Verificando usuário admin...');
+
+    const checkUser = await pool.query(
+      'SELECT id, email, senha FROM usuarios WHERE email = $1',
+      ['admin@vendas.com']
+    );
+
+    if (checkUser.rows.length > 0) {
+      const usuario = checkUser.rows[0];
+      const senhaFunciona = await bcrypt.compare('admin123', usuario.senha);
+
+      if (!senhaFunciona) {
+        console.log('⚠️  Senha do admin incorreta. Corrigindo automaticamente...');
+        const novaSenhaHash = await bcrypt.hash('admin123', 10);
+        await pool.query(
+          'UPDATE usuarios SET senha = $1 WHERE email = $2',
+          [novaSenhaHash, 'admin@vendas.com']
+        );
+        console.log('✅ Senha do admin corrigida! Login: admin@vendas.com / admin123');
+      } else {
+        console.log('✅ Usuário admin OK (admin@vendas.com / admin123)');
+      }
+    } else {
+      console.log('❌ Admin não encontrado. Criando...');
+      const senhaHash = await bcrypt.hash('admin123', 10);
+      await pool.query(
+        'INSERT INTO usuarios (nome, email, senha) VALUES ($1, $2, $3)',
+        ['Admin', 'admin@vendas.com', senhaHash]
+      );
+      console.log('✅ Usuário admin criado! Login: admin@vendas.com / admin123');
+    }
+  } catch (error) {
+    console.error('❌ Erro ao verificar admin:', error.message);
+  }
+}
+
 // ===== INICIAR SERVIDOR =====
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log('═══════════════════════════════════════════════════');
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 FRONTEND_URL: ${process.env.FRONTEND_URL || 'not configured'}`);
   console.log(`🔒 CORS Credentials: enabled`);
+  console.log('───────────────────────────────────────────────────');
+
+  // Verificar e corrigir admin automaticamente
+  await verificarECorrigirAdmin();
+
   console.log('───────────────────────────────────────────────────');
   console.log('📍 Endpoints principais:');
   console.log(`   📤 Upload CSV: POST /api/vendas/upload`);
