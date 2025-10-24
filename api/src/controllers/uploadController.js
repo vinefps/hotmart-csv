@@ -1,4 +1,4 @@
-// ✅ UPLOAD CONTROLLER ATUALIZADO - COM PRODUTO
+// ✅ UPLOAD CONTROLLER - COMPATÍVEL COM FORMATO HOTMART
 const multer = require('multer');
 const csv = require('csv-parser');
 const fs = require('fs');
@@ -30,6 +30,60 @@ const upload = multer({
   }
 });
 
+/**
+ * Detecta o formato do CSV e extrai os dados
+ */
+const extrairDadosCSV = (row) => {
+  // Limpar BOM se existir
+  const cleanRow = {};
+  for (const key in row) {
+    const cleanKey = key.replace(/^\uFEFF/, '').trim();
+    cleanRow[cleanKey] = row[key];
+  }
+
+  // ========================================
+  // FORMATO HOTMART (detectado automaticamente)
+  // ========================================
+  const isHotmart = cleanRow['Nome do Produto'] !== undefined;
+
+  if (isHotmart) {
+    console.log('📦 Formato detectado: HOTMART');
+    
+    return {
+      nome: cleanRow['Nome'] || null,
+      email: cleanRow['Email'] || null,
+      telefone: cleanRow['DDD'] && cleanRow['Telefone'] 
+        ? `(${cleanRow['DDD']}) ${cleanRow['Telefone']}`
+        : cleanRow['Telefone'] || null,
+      produto: cleanRow['Nome do Produto'] || null,
+      tipo_pagamento: cleanRow['Tipo de Pagamento'] || cleanRow['Meio de Pagamento'] || null,
+      faturamento_liquido: cleanRow['Faturamento líquido'] || null,
+      origem_checkout: cleanRow['Origem de Checkout'] || cleanRow['Origem'] || null,
+      status: cleanRow['Status'] === 'Aprovado' ? 'aprovado' : 'cancelado',
+      hotmart_transaction_id: cleanRow['Transação'] || null
+    };
+  }
+
+  // ========================================
+  // FORMATO SIMPLES (padrão antigo)
+  // ========================================
+  console.log('📦 Formato detectado: SIMPLES');
+  
+  return {
+    nome: cleanRow['Nome'] || null,
+    email: cleanRow['Email'] || null,
+    telefone: cleanRow['DDD'] && cleanRow['Telefone']
+      ? `(${cleanRow['DDD']}) ${cleanRow['Telefone']}`
+      : cleanRow['Telefone Completo'] || cleanRow['Telefone'] || null,
+    produto: cleanRow['Produto'] || cleanRow['Nome do Produto'] || null,
+    tipo_pagamento: cleanRow['Tipo de Pagamento'] || null,
+    faturamento_liquido: cleanRow['Faturamento líquido'] || cleanRow['Faturamento Líquido'] || cleanRow['Valor'] || null,
+    origem_checkout: cleanRow['Origem de Checkout'] || cleanRow['Origem'] || null,
+    status: 'aprovado',
+    hotmart_transaction_id: null
+  };
+};
+
 // Controller de upload
 exports.uploadCSV = [
   upload.single('file'),
@@ -53,13 +107,7 @@ exports.uploadCSV = [
         fs.createReadStream(filePath, { encoding: 'utf8' })
           .pipe(csv({ separator: ';' }))
           .on('data', (row) => {
-            // Limpar BOM se existir
-            const cleanRow = {};
-            for (const key in row) {
-              const cleanKey = key.replace(/^\uFEFF/, '').trim();
-              cleanRow[cleanKey] = row[key];
-            }
-            vendas.push(cleanRow);
+            vendas.push(row);
           })
           .on('end', resolve)
           .on('error', reject);
@@ -68,88 +116,87 @@ exports.uploadCSV = [
       console.log(`📊 Total de linhas lidas: ${vendas.length}`);
       if (vendas.length > 0) {
         console.log('📝 Colunas do CSV:', Object.keys(vendas[0]));
-        console.log('📝 Primeira linha:', vendas[0]);
       }
 
       // Processar cada venda
       for (let i = 0; i < vendas.length; i++) {
-        const row = vendas[i];
-
         try {
-          // Extrair campos
-          const nome = row['Nome'] ? row['Nome'].trim() : null;
-          const email = row['Email'] ? row['Email'].trim() : null;
-          
-          // ✅ NOVO: Campo Produto
-          const produto = row['Produto'] || row['Nome do Produto'] || row['produto'] || null;
-          if (produto) {
-            produto = produto.toString().trim();
-          }
-          
-          // Telefone (DDD + Telefone ou Telefone Completo)
-          let telefoneCompleto = null;
-          const ddd = row['DDD'] ? row['DDD'].toString().trim() : '';
-          const telefone = row['Telefone'] ? row['Telefone'].toString().trim() : '';
-          
-          if (ddd && telefone) {
-            telefoneCompleto = `(${ddd}) ${telefone}`;
-          } else if (telefone) {
-            telefoneCompleto = telefone;
-          } else if (row['Telefone Completo']) {
-            telefoneCompleto = row['Telefone Completo'].toString().trim() || null;
-          }
+          // Extrair dados (detecta formato automaticamente)
+          const dados = extrairDadosCSV(vendas[i]);
 
-          const tipo_pagamento = row['Tipo de Pagamento'] ? row['Tipo de Pagamento'].trim() : null;
+          // Limpar e validar nome
+          const nome = dados.nome ? dados.nome.toString().trim() : null;
           
-          // Converter faturamento líquido para número
-          let faturamento_liquido = null;
-          if (row['Faturamento líquido'] || row['Faturamento Líquido'] || row['Valor']) {
-            const faturamentoStr = (row['Faturamento líquido'] || row['Faturamento Líquido'] || row['Valor'])
-              .toString()
-              .replace(',', '.');
-            faturamento_liquido = parseFloat(faturamentoStr) || null;
-          }
-
-          const origem_checkout = row['Origem de Checkout'] || row['Origem'] || null;
-          if (origem_checkout) {
-            origem_checkout = origem_checkout.toString().trim();
-          }
-
-          // Validar campos obrigatórios
           if (!nome) {
             erros.push(`Linha ${i + 2}: Nome é obrigatório`);
             totalErros++;
             continue;
           }
 
-          console.log(`✅ Linha ${i + 2}: nome=${nome}, produto=${produto}, telefone=${telefoneCompleto}`);
+          // Limpar e validar outros campos
+          const email = dados.email ? dados.email.toString().trim() : null;
+          const telefone = dados.telefone ? dados.telefone.toString().trim() : null;
+          const produto = dados.produto ? dados.produto.toString().trim() : null;
+          const tipo_pagamento = dados.tipo_pagamento ? dados.tipo_pagamento.toString().trim() : null;
+          const origem_checkout = dados.origem_checkout ? dados.origem_checkout.toString().trim() : null;
+          const hotmart_transaction_id = dados.hotmart_transaction_id ? dados.hotmart_transaction_id.toString().trim() : null;
 
-          // Inserir no banco COM PRODUTO
+          // Converter faturamento líquido para número
+          let faturamento_liquido = null;
+          if (dados.faturamento_liquido) {
+            const faturamentoStr = dados.faturamento_liquido
+              .toString()
+              .replace(/\./g, '')  // Remove separador de milhar
+              .replace(',', '.'); // Troca vírgula decimal por ponto
+            faturamento_liquido = parseFloat(faturamentoStr) || null;
+          }
+
+          console.log(`✅ Linha ${i + 2}: nome="${nome}", produto="${produto}", valor=${faturamento_liquido}`);
+
+          // Verificar se já existe (por transaction ID)
+          if (hotmart_transaction_id) {
+            const existe = await pool.query(
+              'SELECT id FROM vendas WHERE hotmart_transaction_id = $1',
+              [hotmart_transaction_id]
+            );
+
+            if (existe.rows.length > 0) {
+              console.log(`⚠️ Venda duplicada (transaction: ${hotmart_transaction_id}) - ignorando`);
+              erros.push(`Linha ${i + 2}: Venda já existe (transação ${hotmart_transaction_id})`);
+              totalErros++;
+              continue;
+            }
+          }
+
+          // Inserir no banco
           const resultado = await pool.query(
             `INSERT INTO vendas 
-             (nome, email, telefone, produto, tipo_pagamento, faturamento_liquido, origem_checkout, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'aprovado')
-             RETURNING id, produto, telefone`,
+             (nome, email, telefone, produto, tipo_pagamento, faturamento_liquido, 
+              origem_checkout, status, hotmart_transaction_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING id, produto, telefone, faturamento_liquido`,
             [
-              nome, 
-              email || null, 
-              telefoneCompleto, 
-              produto || null,
-              tipo_pagamento || null, 
-              faturamento_liquido, 
-              origem_checkout || null
+              nome,
+              email,
+              telefone,
+              produto,
+              tipo_pagamento,
+              faturamento_liquido,
+              origem_checkout,
+              dados.status,
+              hotmart_transaction_id
             ]
           );
 
           console.log(
             `✅ Inserido - ID: ${resultado.rows[0].id}, ` +
             `Produto: ${resultado.rows[0].produto}, ` +
-            `Telefone: ${resultado.rows[0].telefone}`
+            `Valor: R$ ${resultado.rows[0].faturamento_liquido}`
           );
 
           totalSucesso++;
         } catch (error) {
-          console.error(`Erro na linha ${i + 2}:`, error.message);
+          console.error(`❌ Erro na linha ${i + 2}:`, error.message);
           erros.push(`Linha ${i + 2}: ${error.message}`);
           totalErros++;
         }
@@ -169,7 +216,7 @@ exports.uploadCSV = [
         }
       });
     } catch (error) {
-      console.error('Erro no upload:', error);
+      console.error('❌ Erro no upload:', error);
       
       // Deletar arquivo em caso de erro
       if (fs.existsSync(filePath)) {
@@ -189,26 +236,48 @@ exports.uploadCSV = [
  * OBTER FORMATO DO CSV ESPERADO
  */
 exports.obterFormatoCSV = (req, res) => {
-  const formato = {
-    separator: ';',
-    encoding: 'UTF-8',
-    colunas: [
-      { nome: 'Nome', obrigatorio: true, exemplo: 'João da Silva' },
-      { nome: 'Email', obrigatorio: false, exemplo: 'joao@email.com' },
-      { nome: 'DDD', obrigatorio: false, exemplo: '11' },
-      { nome: 'Telefone', obrigatorio: false, exemplo: '999999999' },
-      { nome: 'Telefone Completo', obrigatorio: false, exemplo: '(11) 99999-9999' },
-      { nome: 'Produto', obrigatorio: false, exemplo: 'Curso de Marketing' },
-      { nome: 'Tipo de Pagamento', obrigatorio: false, exemplo: 'Cartão de Crédito' },
-      { nome: 'Faturamento líquido', obrigatorio: false, exemplo: '97,00' },
-      { nome: 'Origem de Checkout', obrigatorio: false, exemplo: 'Hotmart' }
-    ],
-    exemplo_csv: 'Nome;Email;DDD;Telefone;Produto;Tipo de Pagamento;Faturamento líquido;Origem de Checkout\n' +
-                 'João da Silva;joao@email.com;11;999999999;Curso de Marketing;Cartão de Crédito;97,00;Hotmart'
+  const formatos = {
+    formato_simples: {
+      separator: ';',
+      encoding: 'UTF-8',
+      colunas: [
+        { nome: 'Nome', obrigatorio: true, exemplo: 'João da Silva' },
+        { nome: 'Email', obrigatorio: false, exemplo: 'joao@email.com' },
+        { nome: 'DDD', obrigatorio: false, exemplo: '11' },
+        { nome: 'Telefone', obrigatorio: false, exemplo: '999999999' },
+        { nome: 'Telefone Completo', obrigatorio: false, exemplo: '(11) 99999-9999' },
+        { nome: 'Produto', obrigatorio: false, exemplo: 'Curso de Marketing' },
+        { nome: 'Tipo de Pagamento', obrigatorio: false, exemplo: 'Cartão de Crédito' },
+        { nome: 'Faturamento líquido', obrigatorio: false, exemplo: '97,00' },
+        { nome: 'Origem de Checkout', obrigatorio: false, exemplo: 'Hotmart' }
+      ],
+      exemplo_csv: 'Nome;Email;DDD;Telefone;Produto;Tipo de Pagamento;Faturamento líquido;Origem de Checkout\n' +
+                   'João da Silva;joao@email.com;11;999999999;Curso de Marketing;Cartão de Crédito;97,00;Hotmart'
+    },
+    formato_hotmart: {
+      separator: ';',
+      encoding: 'UTF-8',
+      descricao: 'O sistema detecta AUTOMATICAMENTE o formato Hotmart (relatório de vendas exportado da Hotmart)',
+      colunas_usadas: [
+        'Nome do Produto',
+        'Transação',
+        'Tipo de Pagamento',
+        'Meio de Pagamento',
+        'Status',
+        'Nome',
+        'Email',
+        'DDD',
+        'Telefone',
+        'Origem de Checkout',
+        'Faturamento líquido'
+      ],
+      nota: 'Use o relatório de vendas diretamente da Hotmart - não precisa modificar!'
+    }
   };
 
   res.json({
     success: true,
-    data: formato
+    message: 'O sistema aceita DOIS formatos de CSV automaticamente',
+    data: formatos
   });
 };
