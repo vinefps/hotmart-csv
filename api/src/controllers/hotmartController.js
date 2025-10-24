@@ -1,5 +1,6 @@
 // controllers/hotmartController.js
 const crypto = require('crypto');
+const pool = require('../db/connection');
 
 // ===== RECEBER WEBHOOK DA HOTMART =====
 exports.receberWebhook = async (req, res) => {
@@ -114,16 +115,52 @@ async function processarCompraCompleta(data) {
     
     console.log('Dados da compra:', compra);
     
-    // TODO: Salvar no banco de dados
-    // await salvarCompraNoBanco(compra);
-    
-    // TODO: Enviar email de confirmação
-    // await enviarEmailConfirmacao(compra);
-    
-    // TODO: Adicionar o comprador no ActiveCampaign
-    // await adicionarNoActiveCampaign(compra);
-    
-    return compra;
+    // ✅ SALVAR NO BANCO DE DADOS
+    try {
+      // Verificar se a transação já existe
+      const existe = await pool.query(
+        'SELECT id FROM vendas WHERE hotmart_transaction_id = $1',
+        [compra.transacao]
+      );
+      
+      if (existe.rows.length > 0) {
+        console.log('⚠️ Transação já existe no banco:', compra.transacao);
+        return { ...compra, duplicada: true };
+      }
+      
+      // Inserir nova venda
+      const resultado = await pool.query(
+        `INSERT INTO vendas 
+         (nome, email, produto, faturamento_liquido, status, hotmart_transaction_id, 
+          tipo_pagamento, origem_checkout)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [
+          compra.compradorNome || 'Cliente Hotmart',
+          compra.compradorEmail,
+          compra.produtoNome || 'Produto Hotmart',
+          compra.valor || 0,
+          'aprovado',
+          compra.transacao,
+          data.purchase?.payment?.type || 'Hotmart',
+          'Webhook Hotmart'
+        ]
+      );
+      
+      console.log('✅ Venda salva no banco - ID:', resultado.rows[0].id);
+      
+      // TODO: Enviar email de confirmação
+      // await enviarEmailConfirmacao(compra);
+      
+      // TODO: Adicionar o comprador no ActiveCampaign
+      // await adicionarNoActiveCampaign(compra);
+      
+      return { ...compra, id: resultado.rows[0].id, salvo: true };
+      
+    } catch (dbError) {
+      console.error('❌ Erro ao salvar no banco:', dbError);
+      throw dbError;
+    }
     
   } catch (error) {
     console.error('Erro ao processar compra:', error);
@@ -133,17 +170,104 @@ async function processarCompraCompleta(data) {
 
 async function processarCompraCancelada(data) {
   console.log('Processando cancelamento...');
-  // Implementar lógica de cancelamento
+  
+  try {
+    const transacao = data.purchase?.transaction;
+    
+    if (!transacao) {
+      console.log('⚠️ Transação não encontrada no webhook de cancelamento');
+      return;
+    }
+    
+    // Atualizar status da venda
+    const resultado = await pool.query(
+      `UPDATE vendas 
+       SET status = 'cancelado', 
+           data_cancelamento = CURRENT_TIMESTAMP,
+           motivo_cancelamento = $1
+       WHERE hotmart_transaction_id = $2
+       RETURNING *`,
+      [data.purchase?.cancellation_reason || 'Cancelado via webhook', transacao]
+    );
+    
+    if (resultado.rows.length > 0) {
+      console.log('✅ Venda cancelada - ID:', resultado.rows[0].id);
+    } else {
+      console.log('⚠️ Venda não encontrada para cancelamento:', transacao);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao processar cancelamento:', error);
+    throw error;
+  }
 }
 
 async function processarReembolso(data) {
   console.log('Processando reembolso...');
-  // Implementar lógica de reembolso
+  
+  try {
+    const transacao = data.purchase?.transaction;
+    
+    if (!transacao) {
+      console.log('⚠️ Transação não encontrada no webhook de reembolso');
+      return;
+    }
+    
+    // Atualizar status da venda
+    const resultado = await pool.query(
+      `UPDATE vendas 
+       SET status = 'reembolso', 
+           data_cancelamento = CURRENT_TIMESTAMP,
+           motivo_cancelamento = $1
+       WHERE hotmart_transaction_id = $2
+       RETURNING *`,
+      [data.purchase?.refund_reason || 'Reembolso solicitado via webhook', transacao]
+    );
+    
+    if (resultado.rows.length > 0) {
+      console.log('✅ Reembolso processado - ID:', resultado.rows[0].id);
+    } else {
+      console.log('⚠️ Venda não encontrada para reembolso:', transacao);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao processar reembolso:', error);
+    throw error;
+  }
 }
 
 async function processarChargeback(data) {
   console.log('Processando chargeback...');
-  // Implementar lógica de chargeback
+  
+  try {
+    const transacao = data.purchase?.transaction;
+    
+    if (!transacao) {
+      console.log('⚠️ Transação não encontrada no webhook de chargeback');
+      return;
+    }
+    
+    // Atualizar status da venda
+    const resultado = await pool.query(
+      `UPDATE vendas 
+       SET status = 'chargeback', 
+           data_cancelamento = CURRENT_TIMESTAMP,
+           motivo_cancelamento = 'Chargeback reportado via webhook'
+       WHERE hotmart_transaction_id = $1
+       RETURNING *`,
+      [transacao]
+    );
+    
+    if (resultado.rows.length > 0) {
+      console.log('✅ Chargeback processado - ID:', resultado.rows[0].id);
+    } else {
+      console.log('⚠️ Venda não encontrada para chargeback:', transacao);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao processar chargeback:', error);
+    throw error;
+  }
 }
 
 // ===== TESTAR WEBHOOK LOCALMENTE =====
