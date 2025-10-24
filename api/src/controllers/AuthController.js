@@ -6,7 +6,10 @@ exports.login = async (req, res) => {
   try {
     const { email, senha } = req.body;
 
+    console.log('🔐 Tentativa de login:', { email, senhaRecebida: senha ? '***' : 'vazio' });
+
     if (!email || !senha) {
+      console.log('❌ Email ou senha não fornecidos');
       return res.status(400).json({
         success: false,
         message: 'Email e senha são obrigatórios'
@@ -19,7 +22,10 @@ exports.login = async (req, res) => {
       [email]
     );
 
+    console.log('👤 Usuários encontrados:', result.rows.length);
+
     if (result.rows.length === 0) {
+      console.log('❌ Usuário não encontrado:', email);
       return res.status(401).json({
         success: false,
         message: 'Credenciais inválidas'
@@ -27,9 +33,12 @@ exports.login = async (req, res) => {
     }
 
     const usuario = result.rows[0];
+    console.log('✅ Usuário encontrado:', { id: usuario.id, email: usuario.email, nome: usuario.nome });
+    console.log('🔑 Hash armazenado:', usuario.senha ? `${usuario.senha.substring(0, 20)}...` : 'vazio');
 
     // Verificar senha
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
+    console.log('🔐 Resultado da comparação:', senhaValida ? '✅ Senha válida' : '❌ Senha inválida');
 
     if (!senhaValida) {
       return res.status(401).json({
