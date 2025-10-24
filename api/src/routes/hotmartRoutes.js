@@ -1,14 +1,21 @@
-// api/src/routes/hotmartRoutes.js (NOVA - Webhook automático)
+// ✅ ROTAS HOTMART ATUALIZADAS
 const express = require('express');
 const router = express.Router();
 const hotmartController = require('../controllers/hotmartController');
 
-// WEBHOOK - NÃO PRECISA authMiddleware (Hotmart não tem seu token)
+// ===== WEBHOOK HOTMART =====
+
+// Receber webhook da Hotmart (SEM autenticação JWT - usa validação HMAC)
+// POST /api/hotmart/webhook
 router.post('/webhook', hotmartController.receberWebhook);
 
-// Rota de teste (opcional)
-router.get('/status', (req, res) => {
-  res.json({ status: 'Webhook ativo', timestamp: new Date() });
-});
+// ===== ROTA DE TESTE (OPCIONAL) =====
+
+// Testar webhook localmente sem precisar da Hotmart
+// POST /api/hotmart/teste
+// Em produção, você pode comentar esta rota
+if (process.env.NODE_ENV === 'development') {
+  router.post('/teste', hotmartController.testarWebhook);
+}
 
 module.exports = router;

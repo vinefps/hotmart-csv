@@ -1,3 +1,4 @@
+// ✅ UPLOAD CONTROLLER ATUALIZADO - COM PRODUTO
 const multer = require('multer');
 const csv = require('csv-parser');
 const fs = require('fs');
@@ -75,11 +76,17 @@ exports.uploadCSV = [
         const row = vendas[i];
 
         try {
-          // Extrair campos - VERSÃO MELHORADA
+          // Extrair campos
           const nome = row['Nome'] ? row['Nome'].trim() : null;
           const email = row['Email'] ? row['Email'].trim() : null;
           
-          // Opção 1: Se DDD e Telefone estão em colunas separadas
+          // ✅ NOVO: Campo Produto
+          const produto = row['Produto'] || row['Nome do Produto'] || row['produto'] || null;
+          if (produto) {
+            produto = produto.toString().trim();
+          }
+          
+          // Telefone (DDD + Telefone ou Telefone Completo)
           let telefoneCompleto = null;
           const ddd = row['DDD'] ? row['DDD'].toString().trim() : '';
           const telefone = row['Telefone'] ? row['Telefone'].toString().trim() : '';
@@ -87,10 +94,8 @@ exports.uploadCSV = [
           if (ddd && telefone) {
             telefoneCompleto = `(${ddd}) ${telefone}`;
           } else if (telefone) {
-            // Se não tem DDD, apenas telefone
             telefoneCompleto = telefone;
           } else if (row['Telefone Completo']) {
-            // Opção 2: Se existe coluna Telefone Completo
             telefoneCompleto = row['Telefone Completo'].toString().trim() || null;
           }
 
@@ -98,12 +103,17 @@ exports.uploadCSV = [
           
           // Converter faturamento líquido para número
           let faturamento_liquido = null;
-          if (row['Faturamento líquido']) {
-            const faturamentoStr = row['Faturamento líquido'].toString().replace(',', '.');
+          if (row['Faturamento líquido'] || row['Faturamento Líquido'] || row['Valor']) {
+            const faturamentoStr = (row['Faturamento líquido'] || row['Faturamento Líquido'] || row['Valor'])
+              .toString()
+              .replace(',', '.');
             faturamento_liquido = parseFloat(faturamentoStr) || null;
           }
 
-          const origem_checkout = row['Origem de Checkout'] ? row['Origem de Checkout'].toString().trim() : null;
+          const origem_checkout = row['Origem de Checkout'] || row['Origem'] || null;
+          if (origem_checkout) {
+            origem_checkout = origem_checkout.toString().trim();
+          }
 
           // Validar campos obrigatórios
           if (!nome) {
@@ -112,17 +122,30 @@ exports.uploadCSV = [
             continue;
           }
 
-          console.log(`✅ Linha ${i + 2}: nome=${nome}, telefone=${telefoneCompleto}`);
+          console.log(`✅ Linha ${i + 2}: nome=${nome}, produto=${produto}, telefone=${telefoneCompleto}`);
 
-          // Inserir no banco
+          // Inserir no banco COM PRODUTO
           const resultado = await pool.query(
-            `INSERT INTO vendas (nome, email, telefone, tipo_pagamento, faturamento_liquido, origem_checkout)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING id, telefone`,
-            [nome, email || null, telefoneCompleto, tipo_pagamento || null, faturamento_liquido, origem_checkout || null]
+            `INSERT INTO vendas 
+             (nome, email, telefone, produto, tipo_pagamento, faturamento_liquido, origem_checkout, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'aprovado')
+             RETURNING id, produto, telefone`,
+            [
+              nome, 
+              email || null, 
+              telefoneCompleto, 
+              produto || null,
+              tipo_pagamento || null, 
+              faturamento_liquido, 
+              origem_checkout || null
+            ]
           );
 
-          console.log(`✅ Inserido com sucesso - ID: ${resultado.rows[0].id}, Telefone: ${resultado.rows[0].telefone}`);
+          console.log(
+            `✅ Inserido - ID: ${resultado.rows[0].id}, ` +
+            `Produto: ${resultado.rows[0].produto}, ` +
+            `Telefone: ${resultado.rows[0].telefone}`
+          );
 
           totalSucesso++;
         } catch (error) {
@@ -142,7 +165,7 @@ exports.uploadCSV = [
           totalLinhas: vendas.length,
           totalSucesso,
           totalErros,
-          erros: erros.slice(0, 10)
+          erros: erros.slice(0, 10) // Mostrar apenas os 10 primeiros erros
         }
       });
     } catch (error) {
@@ -161,3 +184,31 @@ exports.uploadCSV = [
     }
   }
 ];
+
+/**
+ * OBTER FORMATO DO CSV ESPERADO
+ */
+exports.obterFormatoCSV = (req, res) => {
+  const formato = {
+    separator: ';',
+    encoding: 'UTF-8',
+    colunas: [
+      { nome: 'Nome', obrigatorio: true, exemplo: 'João da Silva' },
+      { nome: 'Email', obrigatorio: false, exemplo: 'joao@email.com' },
+      { nome: 'DDD', obrigatorio: false, exemplo: '11' },
+      { nome: 'Telefone', obrigatorio: false, exemplo: '999999999' },
+      { nome: 'Telefone Completo', obrigatorio: false, exemplo: '(11) 99999-9999' },
+      { nome: 'Produto', obrigatorio: false, exemplo: 'Curso de Marketing' },
+      { nome: 'Tipo de Pagamento', obrigatorio: false, exemplo: 'Cartão de Crédito' },
+      { nome: 'Faturamento líquido', obrigatorio: false, exemplo: '97,00' },
+      { nome: 'Origem de Checkout', obrigatorio: false, exemplo: 'Hotmart' }
+    ],
+    exemplo_csv: 'Nome;Email;DDD;Telefone;Produto;Tipo de Pagamento;Faturamento líquido;Origem de Checkout\n' +
+                 'João da Silva;joao@email.com;11;999999999;Curso de Marketing;Cartão de Crédito;97,00;Hotmart'
+  };
+
+  res.json({
+    success: true,
+    data: formato
+  });
+};
