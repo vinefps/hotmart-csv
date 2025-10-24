@@ -1,141 +1,89 @@
-// ✅ HOTMART CONTROLLER - VERSÃO DEBUG CORRIGIDA
-// Esta versão loga TUDO e aceita webhooks mesmo com assinatura inválida
-// Corrige o problema de parse do body
+// ✅ HOTMART CONTROLLER - VERSÃO PRODUÇÃO
+// Validação HMAC ativa e segura
 
 const crypto = require('crypto');
 const pool = require('../db/connection');
 
 /**
- * Valida a assinatura HMAC da Hotmart com LOGS DETALHADOS
+ * Valida a assinatura HMAC da Hotmart (Versão 2.0)
  */
 const validarAssinaturaHotmart = (req) => {
   const secret = process.env.HOTMART_SECRET_KEY;
 
-  console.log('\n🔐 ===== DEBUG DE VALIDAÇÃO HMAC =====');
-  console.log('📋 SECRET configurado:', secret ? `SIM (${secret.length} caracteres)` : 'NÃO');
-  console.log('📋 SECRET (primeiros 10 chars):', secret ? secret.substring(0, 10) + '...' : 'N/A');
-  
   // Detectar secret de exemplo/placeholder
   const isPlaceholder = !secret ||
     secret.includes('abc123') ||
     secret.includes('...') ||
     secret === 'seu_secret_aqui';
 
-  if (isPlaceholder) {
-    console.log('⚠️ Secret parece ser placeholder ou está vazio');
+  // Em desenvolvimento OU com secret de exemplo, permite sem validação
+  if (process.env.NODE_ENV === 'development' && isPlaceholder) {
+    console.warn('⚠️ ========================================');
+    console.warn('⚠️ MODO DESENVOLVIMENTO - VALIDAÇÃO DESATIVADA');
+    console.warn('⚠️ HOTMART_SECRET_KEY não configurado ou é placeholder');
+    console.warn('⚠️ Em produção, configure o secret correto!');
+    console.warn('⚠️ ========================================');
+    return true;
   }
 
   // Hotmart envia a assinatura no header
   const signatureHeader = req.headers['x-hotmart-hottok'];
 
-  console.log('📋 Headers recebidos:');
-  Object.keys(req.headers).forEach(key => {
-    if (key.toLowerCase().includes('hotmart') || key.toLowerCase().includes('hottok')) {
-      console.log(`   ${key}: ${req.headers[key]}`);
-    }
-  });
-
   if (!signatureHeader) {
-    console.error('❌ Header x-hotmart-hottok NÃO ENCONTRADO');
-    console.log('📋 Alguns headers disponíveis:', Object.keys(req.headers).slice(0, 5).join(', '));
-    
-    // ⚠️ TEMPORÁRIO: Aceitar mesmo sem header
-    console.log('⚠️ MODO DEBUG: Aceitando webhook mesmo sem header (INSEGURO!)');
-    return true;
+    console.error('❌ Header x-hotmart-hottok não encontrado');
+    return false;
   }
-
-  console.log('✅ Header x-hotmart-hottok encontrado:', signatureHeader);
-  console.log('   Tamanho:', signatureHeader.length, 'caracteres');
 
   if (!secret || isPlaceholder) {
     console.error('❌ HOTMART_SECRET_KEY não configurado corretamente no .env');
-    
-    // ⚠️ TEMPORÁRIO: Aceitar mesmo sem secret
-    console.log('⚠️ MODO DEBUG: Aceitando webhook mesmo sem secret (INSEGURO!)');
-    return true;
+    console.error('   Configure o secret real da Hotmart para validação funcionar');
+    return false;
   }
 
   try {
-    // CRÍTICO: Detectar se o body é Buffer ou já foi parseado
+    // CRÍTICO: Detectar o formato do body e converter para Buffer
     let rawBody;
     
     if (Buffer.isBuffer(req.body)) {
-      console.log('📋 Body é Buffer (correto para HMAC)');
       rawBody = req.body;
     } else if (typeof req.body === 'string') {
-      console.log('📋 Body é String, convertendo para Buffer');
       rawBody = Buffer.from(req.body, 'utf8');
     } else if (typeof req.body === 'object') {
-      console.log('📋 Body já foi parseado como Object, convertendo para Buffer');
+      // Body já foi parseado pelo Express, reconverter para string
       rawBody = Buffer.from(JSON.stringify(req.body), 'utf8');
     } else {
-      console.log('⚠️ Body em formato desconhecido:', typeof req.body);
-      rawBody = Buffer.from(String(req.body), 'utf8');
+      console.error('❌ Formato de body desconhecido:', typeof req.body);
+      return false;
     }
 
-    console.log('📋 Body para HMAC:');
-    console.log('   Tipo:', typeof rawBody);
-    console.log('   É Buffer?', Buffer.isBuffer(rawBody));
-    console.log('   Tamanho:', rawBody.length, 'bytes');
-
-    // Calcular HMAC com SHA256
-    console.log('\n🔐 Calculando HMAC SHA256...');
+    // Calcular HMAC esperado
     const expectedSignature = crypto
       .createHmac('sha256', secret)
       .update(rawBody)
       .digest('hex');
 
-    console.log('✅ HMAC calculado com sucesso');
-    console.log('   Signature RECEBIDA:', signatureHeader);
-    console.log('   Signature ESPERADA:', expectedSignature);
-    console.log('   São iguais?', signatureHeader === expectedSignature);
-
-    // Tentar com diferentes encodings
-    console.log('\n🧪 Testando variações...');
-    
-    // Teste 1: Base64
-    const expectedBase64 = crypto
-      .createHmac('sha256', secret)
-      .update(rawBody)
-      .digest('base64');
-    console.log('   HMAC Base64:', expectedBase64);
-    console.log('   Igual ao recebido?', signatureHeader === expectedBase64);
+    console.log('🔐 Validando assinatura HMAC...');
+    console.log('   Body length:', rawBody.length, 'bytes');
+    console.log('   Signature recebida (10 chars):', signatureHeader.substring(0, 10) + '...');
+    console.log('   Signature esperada (10 chars):', expectedSignature.substring(0, 10) + '...');
 
     // Comparação segura
-    let isValid = false;
-    try {
-      isValid = crypto.timingSafeEqual(
-        Buffer.from(signatureHeader),
-        Buffer.from(expectedSignature)
-      );
-    } catch (e) {
-      console.log('⚠️ Erro no timingSafeEqual (tamanhos diferentes?)');
-      isValid = signatureHeader === expectedSignature;
-    }
+    const isValid = crypto.timingSafeEqual(
+      Buffer.from(signatureHeader),
+      Buffer.from(expectedSignature)
+    );
 
     if (isValid) {
-      console.log('✅✅✅ Assinatura VÁLIDA! ✅✅✅');
+      console.log('✅ Assinatura válida!');
     } else {
-      console.error('❌❌❌ Assinatura INVÁLIDA! ❌❌❌');
-      console.error('   Secret configurado pode estar incorreto');
-      console.error('   Ou a Hotmart mudou a forma de calcular o HMAC');
-      
-      // ⚠️ TEMPORÁRIO: Aceitar mesmo com assinatura inválida
-      console.log('⚠️ MODO DEBUG: Aceitando webhook mesmo com assinatura inválida (INSEGURO!)');
+      console.error('❌ Assinatura inválida! Secret key pode estar incorreto.');
+      console.error('   Verifique se o HOTMART_SECRET_KEY no .env está correto');
     }
 
-    console.log('🔐 ===== FIM DEBUG =====\n');
-    
-    // ⚠️ MODO DEBUG: Sempre retorna true
-    return true;
-    
+    return isValid;
   } catch (error) {
     console.error('❌ Erro ao validar assinatura:', error.message);
-    console.error('   Stack:', error.stack);
-    
-    // ⚠️ TEMPORÁRIO: Aceitar mesmo com erro
-    console.log('⚠️ MODO DEBUG: Aceitando webhook mesmo com erro (INSEGURO!)');
-    return true;
+    return false;
   }
 };
 
@@ -383,24 +331,28 @@ exports.receberWebhook = async (req, res) => {
   try {
     console.log('\n🔔 ========================================');
     console.log('🔔 WEBHOOK RECEBIDO DA HOTMART (v2.0)');
-    console.log('🔔 ⚠️⚠️⚠️ MODO DEBUG ATIVO ⚠️⚠️⚠️');
     console.log('🔔 ========================================');
     console.log('📅 Data/Hora:', new Date().toLocaleString('pt-BR'));
 
-    // 1. Validar assinatura HMAC (modo debug - aceita mesmo se inválida)
-    validarAssinaturaHotmart(req);
+    // 1. Validar assinatura HMAC
+    if (!validarAssinaturaHotmart(req)) {
+      console.error('❌ ASSINATURA HMAC INVÁLIDA - Webhook rejeitado');
+      return res.status(401).json({
+        success: false,
+        error: 'Assinatura inválida'
+      });
+    }
 
-    // 2. Parsear o body - CORRIGIDO para lidar com diferentes formatos
+    console.log('✅ Assinatura HMAC validada com sucesso');
+
+    // 2. Parsear o body - detecta automaticamente o formato
     let bodyParsed;
     
     if (Buffer.isBuffer(req.body)) {
-      console.log('📦 Body é Buffer, parseando...');
       bodyParsed = JSON.parse(req.body.toString('utf8'));
     } else if (typeof req.body === 'string') {
-      console.log('📦 Body é String, parseando...');
       bodyParsed = JSON.parse(req.body);
     } else if (typeof req.body === 'object') {
-      console.log('📦 Body já é Object, usando diretamente');
       bodyParsed = req.body;
     } else {
       throw new Error(`Formato de body inesperado: ${typeof req.body}`);
@@ -408,10 +360,8 @@ exports.receberWebhook = async (req, res) => {
 
     const { event, data } = bodyParsed;
     console.log('📦 Tipo de Evento:', event);
-    console.log('📦 Payload (resumido):');
-    console.log('   Comprador:', data.buyer?.name || 'N/A');
-    console.log('   Produto:', data.product?.name || 'N/A');
-    console.log('   Transaction:', data.purchase?.transaction || 'N/A');
+    console.log('📦 Comprador:', data.buyer?.name || 'N/A');
+    console.log('📦 Produto:', data.product?.name || 'N/A');
 
     let resultado;
 
@@ -441,12 +391,12 @@ exports.receberWebhook = async (req, res) => {
         resultado = await processarCancelamento(data, 'CHARGEBACK');
         break;
 
-      // PROTESTOS
+      // PROTESTOS (tratado como cancelamento)
       case 'PURCHASE_PROTEST':
         resultado = await processarCancelamento(data, 'PROTESTO');
         break;
 
-      // Outros eventos
+      // Outros eventos não processados
       default:
         console.log(`ℹ️ Evento ${event} recebido mas não processado`);
         resultado = {
@@ -458,7 +408,7 @@ exports.receberWebhook = async (req, res) => {
     console.log('✅ Processamento concluído:', resultado);
     console.log('🔔 ========================================\n');
 
-    // 4. Responder 200 OK
+    // 4. Responder 200 OK para Hotmart
     res.json(resultado);
 
   } catch (error) {
@@ -474,11 +424,12 @@ exports.receberWebhook = async (req, res) => {
 };
 
 /**
- * ENDPOINT DE TESTE
+ * ENDPOINT DE TESTE (opcional - para testar sem Hotmart)
  */
 exports.testarWebhook = async (req, res) => {
   console.log('🧪 Teste de webhook iniciado');
 
+  // Exemplo de payload de venda
   const payloadVendaTeste = {
     event: 'PURCHASE_COMPLETE',
     data: {
@@ -504,7 +455,6 @@ exports.testarWebhook = async (req, res) => {
   };
 
   try {
-    // Simular como se fosse uma requisição real
     req.body = payloadVendaTeste;
     await exports.receberWebhook(req, res);
   } catch (error) {
