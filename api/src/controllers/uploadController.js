@@ -1,4 +1,4 @@
-// ✅ UPLOAD CONTROLLER - COMPATÍVEL COM FORMATO HOTMART
+// ✅ UPLOAD CONTROLLER - FORMATO HOTMART COM VALORES CORRETOS
 const multer = require('multer');
 const csv = require('csv-parser');
 const fs = require('fs');
@@ -31,6 +31,45 @@ const upload = multer({
 });
 
 /**
+ * Converte string de valor para número (detecta formato automaticamente)
+ * Suporta: "2.912,76" (BR) ou "2912.76" (US/Hotmart)
+ */
+const converterValor = (valor) => {
+  if (!valor) return null;
+  
+  const str = valor.toString().trim();
+  if (!str) return null;
+  
+  // Contar pontos e vírgulas
+  const pontosCount = (str.match(/\./g) || []).length;
+  const virgulasCount = (str.match(/,/g) || []).length;
+  
+  // Formato brasileiro: 2.912,76 (ponto = milhar, vírgula = decimal)
+  if (virgulasCount > 0 && pontosCount > 0) {
+    return parseFloat(str.replace(/\./g, '').replace(',', '.'));
+  }
+  
+  // Formato brasileiro simples: 2912,76 (apenas vírgula decimal)
+  if (virgulasCount > 0 && pontosCount === 0) {
+    return parseFloat(str.replace(',', '.'));
+  }
+  
+  // Formato US/Hotmart: 2912.76 (ponto = decimal)
+  // Ou 2,912.76 (vírgula = milhar, ponto = decimal)
+  if (pontosCount > 0) {
+    // Se tem vírgula antes do ponto, é separador de milhar
+    if (virgulasCount > 0) {
+      return parseFloat(str.replace(/,/g, ''));
+    }
+    // Apenas ponto = decimal
+    return parseFloat(str);
+  }
+  
+  // Apenas números
+  return parseFloat(str);
+};
+
+/**
  * Detecta o formato do CSV e extrai os dados
  */
 const extrairDadosCSV = (row) => {
@@ -47,8 +86,6 @@ const extrairDadosCSV = (row) => {
   const isHotmart = cleanRow['Nome do Produto'] !== undefined;
 
   if (isHotmart) {
-    console.log('📦 Formato detectado: HOTMART');
-    
     return {
       nome: cleanRow['Nome'] || null,
       email: cleanRow['Email'] || null,
@@ -60,15 +97,14 @@ const extrairDadosCSV = (row) => {
       faturamento_liquido: cleanRow['Faturamento líquido'] || null,
       origem_checkout: cleanRow['Origem de Checkout'] || cleanRow['Origem'] || null,
       status: cleanRow['Status'] === 'Aprovado' ? 'aprovado' : 'cancelado',
-      hotmart_transaction_id: cleanRow['Transação'] || null
+      hotmart_transaction_id: cleanRow['Transação'] || null,
+      formato: 'HOTMART'
     };
   }
 
   // ========================================
   // FORMATO SIMPLES (padrão antigo)
   // ========================================
-  console.log('📦 Formato detectado: SIMPLES');
-  
   return {
     nome: cleanRow['Nome'] || null,
     email: cleanRow['Email'] || null,
@@ -80,7 +116,8 @@ const extrairDadosCSV = (row) => {
     faturamento_liquido: cleanRow['Faturamento líquido'] || cleanRow['Faturamento Líquido'] || cleanRow['Valor'] || null,
     origem_checkout: cleanRow['Origem de Checkout'] || cleanRow['Origem'] || null,
     status: 'aprovado',
-    hotmart_transaction_id: null
+    hotmart_transaction_id: null,
+    formato: 'SIMPLES'
   };
 };
 
@@ -113,9 +150,9 @@ exports.uploadCSV = [
           .on('error', reject);
       });
 
-      console.log(`📊 Total de linhas lidas: ${vendas.length}`);
+      console.log(`\n📊 Total de linhas lidas: ${vendas.length}`);
       if (vendas.length > 0) {
-        console.log('📝 Colunas do CSV:', Object.keys(vendas[0]));
+        console.log('📝 Colunas detectadas:', Object.keys(vendas[0]).slice(0, 10).join(', ') + '...');
       }
 
       // Processar cada venda
@@ -123,6 +160,10 @@ exports.uploadCSV = [
         try {
           // Extrair dados (detecta formato automaticamente)
           const dados = extrairDadosCSV(vendas[i]);
+
+          if (i === 0) {
+            console.log(`📦 Formato detectado: ${dados.formato}\n`);
+          }
 
           // Limpar e validar nome
           const nome = dados.nome ? dados.nome.toString().trim() : null;
@@ -141,17 +182,15 @@ exports.uploadCSV = [
           const origem_checkout = dados.origem_checkout ? dados.origem_checkout.toString().trim() : null;
           const hotmart_transaction_id = dados.hotmart_transaction_id ? dados.hotmart_transaction_id.toString().trim() : null;
 
-          // Converter faturamento líquido para número
-          let faturamento_liquido = null;
-          if (dados.faturamento_liquido) {
-            const faturamentoStr = dados.faturamento_liquido
-              .toString()
-              .replace(/\./g, '')  // Remove separador de milhar
-              .replace(',', '.'); // Troca vírgula decimal por ponto
-            faturamento_liquido = parseFloat(faturamentoStr) || null;
-          }
+          // ✅ CONVERTER VALOR CORRETAMENTE (detecta formato automaticamente)
+          const faturamento_liquido = converterValor(dados.faturamento_liquido);
 
-          console.log(`✅ Linha ${i + 2}: nome="${nome}", produto="${produto}", valor=${faturamento_liquido}`);
+          console.log(
+            `✅ Linha ${i + 2}: ` +
+            `nome="${nome.substring(0, 20)}...", ` +
+            `produto="${produto?.substring(0, 20) || 'N/A'}", ` +
+            `valor=R$ ${faturamento_liquido?.toFixed(2) || '0.00'}`
+          );
 
           // Verificar se já existe (por transaction ID)
           if (hotmart_transaction_id) {
@@ -161,7 +200,7 @@ exports.uploadCSV = [
             );
 
             if (existe.rows.length > 0) {
-              console.log(`⚠️ Venda duplicada (transaction: ${hotmart_transaction_id}) - ignorando`);
+              console.log(`⚠️ Linha ${i + 2}: Venda duplicada - ignorando`);
               erros.push(`Linha ${i + 2}: Venda já existe (transação ${hotmart_transaction_id})`);
               totalErros++;
               continue;
@@ -174,7 +213,7 @@ exports.uploadCSV = [
              (nome, email, telefone, produto, tipo_pagamento, faturamento_liquido, 
               origem_checkout, status, hotmart_transaction_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-             RETURNING id, produto, telefone, faturamento_liquido`,
+             RETURNING id, produto, faturamento_liquido`,
             [
               nome,
               email,
@@ -189,9 +228,8 @@ exports.uploadCSV = [
           );
 
           console.log(
-            `✅ Inserido - ID: ${resultado.rows[0].id}, ` +
-            `Produto: ${resultado.rows[0].produto}, ` +
-            `Valor: R$ ${resultado.rows[0].faturamento_liquido}`
+            `💾 Inserido - ID: ${resultado.rows[0].id}, ` +
+            `Valor: R$ ${resultado.rows[0].faturamento_liquido?.toFixed(2) || '0.00'}`
           );
 
           totalSucesso++;
@@ -204,6 +242,11 @@ exports.uploadCSV = [
 
       // Deletar arquivo após processamento
       fs.unlinkSync(filePath);
+
+      console.log(`\n✅ Processamento concluído!`);
+      console.log(`   Total processado: ${vendas.length}`);
+      console.log(`   Sucesso: ${totalSucesso}`);
+      console.log(`   Erros: ${totalErros}\n`);
 
       res.json({
         success: true,
@@ -248,7 +291,7 @@ exports.obterFormatoCSV = (req, res) => {
         { nome: 'Telefone Completo', obrigatorio: false, exemplo: '(11) 99999-9999' },
         { nome: 'Produto', obrigatorio: false, exemplo: 'Curso de Marketing' },
         { nome: 'Tipo de Pagamento', obrigatorio: false, exemplo: 'Cartão de Crédito' },
-        { nome: 'Faturamento líquido', obrigatorio: false, exemplo: '97,00' },
+        { nome: 'Faturamento líquido', obrigatorio: false, exemplo: '97,00 ou 97.00' },
         { nome: 'Origem de Checkout', obrigatorio: false, exemplo: 'Hotmart' }
       ],
       exemplo_csv: 'Nome;Email;DDD;Telefone;Produto;Tipo de Pagamento;Faturamento líquido;Origem de Checkout\n' +
@@ -271,13 +314,14 @@ exports.obterFormatoCSV = (req, res) => {
         'Origem de Checkout',
         'Faturamento líquido'
       ],
-      nota: 'Use o relatório de vendas diretamente da Hotmart - não precisa modificar!'
+      nota: 'Use o relatório de vendas diretamente da Hotmart - não precisa modificar!',
+      valores_aceitos: 'Aceita formatos: 2912.76 (US) ou 2.912,76 (BR)'
     }
   };
 
   res.json({
     success: true,
-    message: 'O sistema aceita DOIS formatos de CSV automaticamente',
+    message: 'O sistema aceita DOIS formatos de CSV e DOIS formatos de valores automaticamente',
     data: formatos
   });
 };
