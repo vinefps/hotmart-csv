@@ -7,17 +7,34 @@ const pool = require('../db/connection');
  */
 const validarAssinaturaHotmart = (req) => {
   const secret = process.env.HOTMART_SECRET_KEY;
-  
-  // Em desenvolvimento, permite sem validação
-  if (process.env.NODE_ENV === 'development' && !secret) {
-    console.warn('⚠️ HOTMART_SECRET_KEY não configurado - modo DEV');
+
+  // Detectar secret de exemplo/placeholder
+  const isPlaceholder = !secret ||
+                       secret.includes('abc123') ||
+                       secret.includes('...') ||
+                       secret === 'seu_secret_aqui';
+
+  // Em desenvolvimento OU com secret de exemplo, permite sem validação
+  if (process.env.NODE_ENV === 'development' && isPlaceholder) {
+    console.warn('⚠️ ========================================');
+    console.warn('⚠️ MODO DESENVOLVIMENTO - VALIDAÇÃO DESATIVADA');
+    console.warn('⚠️ HOTMART_SECRET_KEY não configurado ou é placeholder');
+    console.warn('⚠️ Em produção, configure o secret correto!');
+    console.warn('⚠️ ========================================');
     return true;
   }
 
   // Hotmart envia a assinatura no header
   const signatureHeader = req.headers['x-hotmart-hottok'];
-  
-  if (!signatureHeader || !secret) {
+
+  if (!signatureHeader) {
+    console.error('❌ Header x-hotmart-hottok não encontrado');
+    return false;
+  }
+
+  if (!secret || isPlaceholder) {
+    console.error('❌ HOTMART_SECRET_KEY não configurado corretamente no .env');
+    console.error('   Configure o secret real da Hotmart para validação funcionar');
     return false;
   }
 
@@ -28,14 +45,26 @@ const validarAssinaturaHotmart = (req) => {
       .createHmac('sha256', secret)
       .update(body)
       .digest('hex');
-    
+
+    console.log('🔐 Validando assinatura HMAC...');
+    console.log('   Signature recebida:', signatureHeader.substring(0, 20) + '...');
+    console.log('   Signature esperada:', expectedSignature.substring(0, 20) + '...');
+
     // Comparação segura
-    return crypto.timingSafeEqual(
+    const isValid = crypto.timingSafeEqual(
       Buffer.from(signatureHeader),
       Buffer.from(expectedSignature)
     );
+
+    if (isValid) {
+      console.log('✅ Assinatura válida!');
+    } else {
+      console.error('❌ Assinatura inválida! Secret key pode estar incorreto.');
+    }
+
+    return isValid;
   } catch (error) {
-    console.error('Erro ao validar assinatura:', error);
+    console.error('❌ Erro ao validar assinatura:', error.message);
     return false;
   }
 };
