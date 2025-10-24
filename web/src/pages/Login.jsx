@@ -1,114 +1,48 @@
-import { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-
-const Login = () => {
-  const navigate = useNavigate();
-  const { login } = useContext(AuthContext);
-  
-  const [formData, setFormData] = useState({
-    email: '',
-    senha: ''
-  });
-  const [erro, setErro] = useState('');
-  const [carregando, setCarregando] = useState(false);
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-    setErro('');
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setCarregando(true);
-    setErro('');
-
-    const result = await login(formData.email, formData.senha);
-
-    if (result.success) {
-      navigate('/');
-    } else {
-      setErro(result.message);
-    }
-
-    setCarregando(false);
-  };
-
+const Loading = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-2xl">
-        <div>
-          <h2 className="text-center text-3xl font-extrabold text-gray-900">
-            💰 Sistema de Vendas
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Faça login para continuar
-          </p>
-        </div>
-
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="seu@email.com"
-              />
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+      <div className="relative">
+        {/* Círculos animados de fundo */}
+        <div className="absolute -top-20 -left-20 w-40 h-40 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
+        <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
+        <div className="absolute -bottom-20 left-20 w-40 h-40 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000"></div>
+        
+        {/* Container principal */}
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-12 shadow-2xl border border-white/20">
+          {/* Spinner principal */}
+          <div className="relative w-32 h-32 mx-auto mb-8">
+            <div className="absolute inset-0 rounded-full border-4 border-white/20"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-white animate-spin"></div>
+            <div className="absolute inset-2 rounded-full border-4 border-transparent border-t-purple-400 animate-spin animation-reverse animation-delay-150"></div>
+            <div className="absolute inset-4 rounded-full border-4 border-transparent border-t-blue-400 animate-spin animation-delay-300"></div>
             
-            <div>
-              <label htmlFor="senha" className="block text-sm font-medium text-gray-700 mb-1">
-                Senha
-              </label>
-              <input
-                id="senha"
-                name="senha"
-                type="password"
-                required
-                value={formData.senha}
-                onChange={handleChange}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="••••••••"
-              />
+            {/* Ícone central */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg className="w-12 h-12 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
             </div>
           </div>
-
-          {erro && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-              {erro}
+          
+          {/* Texto de carregamento */}
+          <div className="text-center space-y-3">
+            <h3 className="text-2xl font-bold text-white">Carregando</h3>
+            <div className="flex items-center justify-center space-x-2">
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce animation-delay-150"></div>
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce animation-delay-300"></div>
             </div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              disabled={carregando}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {carregando ? 'Entrando...' : 'Entrar'}
-            </button>
+            <p className="text-sm text-gray-300 mt-4">Preparando seus dados...</p>
           </div>
-        </form>
-
-        <div className="text-center text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
-          <p className="font-semibold mb-1">Credenciais de teste:</p>
-          <p>Email: admin@vendas.com</p>
-          <p>Senha: admin123</p>
+          
+          {/* Barra de progresso */}
+          <div className="mt-8 w-full bg-white/10 rounded-full h-2 overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-500 via-blue-500 to-indigo-500 h-full rounded-full animate-shimmer"></div>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default Login;
+export default Loading;
