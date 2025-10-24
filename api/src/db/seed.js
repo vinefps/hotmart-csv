@@ -4,56 +4,38 @@ const pool = require('./connection');
 
 async function seed() {
   try {
-    console.log('🌱 Iniciando seed do usuário admin...');
+    console.log('🌱 Iniciando seed...');
+
+    // Hash da senha
+    const senhaHash = await bcrypt.hash('admin123', 10);
 
     // Verificar se usuário já existe
     const checkUser = await pool.query(
-      'SELECT id, email, senha FROM usuarios WHERE email = $1',
+      'SELECT id FROM usuarios WHERE email = $1',
       ['admin@vendas.com']
     );
 
     if (checkUser.rows.length > 0) {
-      const usuario = checkUser.rows[0];
-      console.log('ℹ️  Usuário admin já existe (ID: ' + usuario.id + ')');
+      console.log('ℹ️ Usuário admin já existe. Removendo...');
 
-      // Testar se a senha atual funciona
-      const senhaFunciona = await bcrypt.compare('admin123', usuario.senha);
-
-      if (senhaFunciona) {
-        console.log('✅ Senha do admin está correta. Nenhuma ação necessária.');
-        process.exit(0);
-      } else {
-        console.log('⚠️  Senha do admin está incorreta. Atualizando...');
-
-        // Atualizar apenas a senha
-        const novaSenhaHash = await bcrypt.hash('admin123', 10);
-        await pool.query(
-          'UPDATE usuarios SET senha = $1 WHERE email = $2',
-          [novaSenhaHash, 'admin@vendas.com']
-        );
-
-        console.log('✅ Senha do admin atualizada com sucesso!');
-      }
-    } else {
-      console.log('❌ Usuário admin não existe. Criando...');
-
-      // Criar hash da senha
-      const senhaHash = await bcrypt.hash('admin123', 10);
-
-      // Criar usuário admin
+      // Apagar usuário existente
       await pool.query(
-        'INSERT INTO usuarios (nome, email, senha) VALUES ($1, $2, $3)',
-        ['Admin', 'admin@vendas.com', senhaHash]
+        'DELETE FROM usuarios WHERE email = $1',
+        ['admin@vendas.com']
       );
 
-      console.log('✅ Usuário admin criado com sucesso!');
+      console.log('✅ Usuário admin removido');
     }
 
-    console.log('');
-    console.log('═══════════════════════════════════');
+    // Criar usuário admin
+    await pool.query(
+      'INSERT INTO usuarios (nome, email, senha) VALUES ($1, $2, $3)',
+      ['Admin', 'admin@vendas.com', senhaHash]
+    );
+
+    console.log('✅ Usuário admin criado com sucesso!');
     console.log('📧 Email: admin@vendas.com');
     console.log('🔐 Senha: admin123');
-    console.log('═══════════════════════════════════');
 
     process.exit(0);
   } catch (error) {
