@@ -5,45 +5,48 @@ export const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
   const [usuario, setUsuario] = useState(null);
-  const [carregando, setCarregando] = useState(true);
+  const [carregandoAuth, setCarregandoAuth] = useState(false);
 
+  // Verifica se tem token salvo ao iniciar
   useEffect(() => {
     const token = localStorage.getItem('token');
     const usuarioSalvo = localStorage.getItem('usuario');
-
+    
     if (token && usuarioSalvo) {
-      setUsuario(JSON.parse(usuarioSalvo));
-      verificarToken();
-    } else {
-      setCarregando(false);
+      try {
+        setUsuario(JSON.parse(usuarioSalvo));
+      } catch (error) {
+        console.error('Erro ao recuperar usuário:', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
+      }
     }
   }, []);
 
-  const verificarToken = async () => {
-    try {
-      const response = await authService.verificarToken();
-      setUsuario(response.data);
-    } catch (error) {
-      logout();
-    } finally {
-      setCarregando(false);
-    }
-  };
-
   const login = async (email, senha) => {
+    setCarregandoAuth(true);
     try {
       const response = await authService.login(email, senha);
-      const { token, usuario } = response.data;
-
-      localStorage.setItem('token', token);
-      localStorage.setItem('usuario', JSON.stringify(usuario));
-
-      setUsuario(usuario);
-      return { success: true };
+      
+      if (response.token) {
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('usuario', JSON.stringify(response.usuario));
+        setUsuario(response.usuario);
+        setCarregandoAuth(false);
+        return { success: true };
+      }
+      
+      setCarregandoAuth(false);
+      return { 
+        success: false, 
+        message: response.message || 'Erro ao fazer login' 
+      };
     } catch (error) {
-      return {
-        success: false,
-        message: error.response?.data?.message || 'Erro ao fazer login'
+      console.error('Erro no login:', error);
+      setCarregandoAuth(false);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Erro ao conectar com o servidor' 
       };
     }
   };
@@ -54,20 +57,13 @@ export const AuthProvider = ({ children }) => {
     setUsuario(null);
   };
 
-  const estaAutenticado = () => {
-    return !!usuario;
-  };
-
   return (
-    <AuthContext.Provider
-      value={{
-        usuario,
-        carregando,
-        login,
-        logout,
-        estaAutenticado
-      }}
-    >
+    <AuthContext.Provider value={{
+      usuario,
+      login,
+      logout,
+      carregandoAuth
+    }}>
       {children}
     </AuthContext.Provider>
   );

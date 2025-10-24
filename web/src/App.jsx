@@ -1,62 +1,63 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import { useContext } from 'react';
-import { AuthProvider, AuthContext } from './context/AuthContext';
+import { AuthContext } from './context/AuthContext';
 import Login from './pages/Login';
 import Vendas from './pages/Vendas';
-import Loading from './components/Loading';
 
-// Rota protegida
+// Componente para proteger rotas
 const PrivateRoute = ({ children }) => {
-  const { estaAutenticado, carregando } = useContext(AuthContext);
-
-  if (carregando) {
-    return <Loading />;
+  const { usuario } = useContext(AuthContext);
+  
+  // Se não estiver autenticado, redireciona para login
+  if (!usuario) {
+    return <Navigate to="/login" replace />;
   }
-
-  return estaAutenticado() ? children : <Navigate to="/login" />;
+  
+  return children;
 };
 
-// Rota pública (redireciona se já autenticado)
+// Componente para rota pública (login)
 const PublicRoute = ({ children }) => {
-  const { estaAutenticado, carregando } = useContext(AuthContext);
-
-  if (carregando) {
-    return <Loading />;
+  const { usuario } = useContext(AuthContext);
+  
+  // Se já estiver autenticado, redireciona para home
+  if (usuario) {
+    return <Navigate to="/" replace />;
   }
-
-  return !estaAutenticado() ? children : <Navigate to="/" />;
+  
+  return children;
 };
-
-function AppRoutes() {
-  return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        }
-      />
-      <Route
-        path="/"
-        element={
-          <PrivateRoute>
-            <Vendas />
-          </PrivateRoute>
-        }
-      />
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
-  );
-}
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <Router>
+        <Routes>
+          {/* Rota pública - Login */}
+          <Route 
+            path="/login" 
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            } 
+          />
+          
+          {/* Rota protegida - Vendas */}
+          <Route 
+            path="/" 
+            element={
+              <PrivateRoute>
+                <Vendas />
+              </PrivateRoute>
+            } 
+          />
+          
+          {/* Redireciona qualquer rota não encontrada para home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
     </AuthProvider>
   );
 }
