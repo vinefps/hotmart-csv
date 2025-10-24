@@ -86,17 +86,22 @@ const extrairDadosCSV = (row) => {
   const isHotmart = cleanRow['Nome do Produto'] !== undefined;
 
   if (isHotmart) {
+    // Verificar status de forma robusta (case-insensitive e múltiplas variações)
+    const statusOriginal = (cleanRow['Status'] || '').toString().trim().toLowerCase();
+    const statusesAprovados = ['aprovado', 'completo', 'concluído', 'ativo', 'active', 'completed', 'approved'];
+    const statusFinal = statusesAprovados.includes(statusOriginal) ? 'aprovado' : 'cancelado';
+
     return {
       nome: cleanRow['Nome'] || null,
       email: cleanRow['Email'] || null,
-      telefone: cleanRow['DDD'] && cleanRow['Telefone'] 
+      telefone: cleanRow['DDD'] && cleanRow['Telefone']
         ? `(${cleanRow['DDD']}) ${cleanRow['Telefone']}`
         : cleanRow['Telefone'] || null,
       produto: cleanRow['Nome do Produto'] || null,
       tipo_pagamento: cleanRow['Tipo de Pagamento'] || cleanRow['Meio de Pagamento'] || null,
       faturamento_liquido: cleanRow['Faturamento líquido'] || null,
       origem_checkout: cleanRow['Origem de Checkout'] || cleanRow['Origem'] || null,
-      status: cleanRow['Status'] === 'Aprovado' ? 'aprovado' : 'cancelado',
+      status: statusFinal,
       hotmart_transaction_id: cleanRow['Transação'] || null,
       formato: 'HOTMART'
     };
