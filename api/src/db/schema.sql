@@ -140,10 +140,9 @@ COMMENT ON VIEW vendas_resumo_status IS 'Resumo de vendas agrupadas por status';
 
 -- Inserir usuário padrão
 -- ⚠️ IMPORTANTE: Em PRODUÇÃO, usar senha hasheada!
--- Exemplo com bcrypt: npm install bcrypt
--- const hash = await bcrypt.hash('admin123', 10);
+-- Hash válido para senha: admin123
 INSERT INTO usuarios (nome, email, senha) 
-VALUES ('Admin', 'admin@vendas.com', '$2a$10$8K1p/a0dL3fzIm0Z9RqXkO7dX3aV5lG9pK8yE5hQf8xR6tN2mP3Ye')
+VALUES ('Admin', 'admin@vendas.com', '$2a$10$LQ09Nl8zgewwJKD/IFEyt.rQIT//OeaWT//63T0VxrGhcHQZ4VYWy')
 ON CONFLICT (email) DO NOTHING;
 
 -- ============================================

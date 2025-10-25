@@ -12,7 +12,7 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
-    'Content-Type', 
+    'Content-Type',
     'Authorization',
     'x-hotmart-hottok' // ← ADICIONA HEADER DO HOTMART
   ],
@@ -107,7 +107,7 @@ if (process.env.NODE_ENV === 'development') {
     console.log('🧪 Teste de Webhook');
     console.log('Headers:', req.headers);
     console.log('Body:', req.body);
-    
+
     res.json({
       success: true,
       message: 'Teste recebido',
@@ -120,7 +120,7 @@ if (process.env.NODE_ENV === 'development') {
 // ===== TRATAMENTO DE ERROS GLOBAL =====
 app.use((err, req, res, next) => {
   console.error('❌ Erro:', err);
-  
+
   // Se for erro do webhook, ainda retorna 200 para evitar reenvio
   if (req.path === '/api/hotmart/webhook') {
     return res.status(200).json({
@@ -129,7 +129,7 @@ app.use((err, req, res, next) => {
       error: process.env.NODE_ENV === 'development' ? err.message : 'Erro interno'
     });
   }
-  
+
   res.status(err.status || 500).json({
     error: true,
     message: err.message || 'Erro interno do servidor',
