@@ -37,20 +37,6 @@ const Header = () => {
             </div>
           </div>
 
-          {/* Menu Desktop */}
-          <div className="hidden md:flex items-center space-x-6">
-            {/* Stats Cards Mini */}
-            <div className="flex items-center space-x-4 mr-6">
-              <div className="bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/20">
-                <p className="text-xs text-gray-300">Total Vendas</p>
-                <p className="text-lg font-bold text-white">R$ 45.280</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/20">
-                <p className="text-xs text-gray-300">Este Mês</p>
-                <p className="text-lg font-bold text-green-400">+127</p>
-              </div>
-            </div>
-
             {/* Perfil Dropdown */}
             <div className="relative">
               <button
