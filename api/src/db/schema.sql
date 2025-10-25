@@ -140,9 +140,9 @@ COMMENT ON VIEW vendas_resumo_status IS 'Resumo de vendas agrupadas por status';
 
 -- Inserir usuário padrão
 -- ⚠️ IMPORTANTE: Senha simples (sem bcrypt no momento)
-INSERT INTO usuarios (nome, email, senha) 
-VALUES ('Admin', 'admin@vendas.com', 'admin123')
-ON CONFLICT (email) DO NOTHING;
+-- INSERT INTO usuarios (nome, email, senha) 
+-- VALUES ('Admin', 'admin@vendas.com', 'admin123')
+-- ON CONFLICT (email) DO NOTHING;
 
 -- ============================================
 -- PASSO 7: TRIGGER PARA ATUALIZAR updated_at

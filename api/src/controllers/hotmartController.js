@@ -109,7 +109,7 @@ async function processarCompraCompleta(data) {
       produtoNome: data.product?.name,
       compradorEmail: data.buyer?.email,
       compradorNome: data.buyer?.name,
-      valor: data.purchase?.price,
+      valor: data.purchase?.price?.value || data.purchase?.price || 0,
       status: data.purchase?.status,
       dataCompra: data.purchase?.approved_date || new Date().toISOString()
     };
