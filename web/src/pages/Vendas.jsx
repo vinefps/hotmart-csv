@@ -227,80 +227,6 @@ const Vendas = () => {
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Cards de Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-xl p-6 border-t-4 border-blue-500 transform hover:scale-105 transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">Total de Vendas</p>
-                <p className="text-3xl font-black text-gray-800">{estatisticas.totalVendas}</p>
-              </div>
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                </svg>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-green-500 font-semibold">+12.5%</span>
-              <span className="text-gray-500 ml-2">vs mês anterior</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-xl p-6 border-t-4 border-green-500 transform hover:scale-105 transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">Vendas Ativas</p>
-                <p className="text-3xl font-black text-gray-800">{estatisticas.vendasAtivas}</p>
-              </div>
-              <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-green-500 font-semibold">95.4%</span>
-              <span className="text-gray-500 ml-2">taxa de aprovação</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-xl p-6 border-t-4 border-red-500 transform hover:scale-105 transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">Cancelamentos</p>
-                <p className="text-3xl font-black text-gray-800">{estatisticas.vendasCanceladas}</p>
-              </div>
-              <div className="w-14 h-14 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-red-500 font-semibold">4.6%</span>
-              <span className="text-gray-500 ml-2">taxa de cancelamento</span>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl shadow-xl p-6 text-white transform hover:scale-105 transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white/80 text-sm font-medium">Faturamento Total</p>
-                <p className="text-3xl font-black">{formatarMoeda(estatisticas.faturamentoTotal)}</p>
-              </div>
-              <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-white font-semibold">+28.7%</span>
-              <span className="text-white/80 ml-2">crescimento mensal</span>
-            </div>
-          </div>
-        </div>
         {/* Mensagem de feedback */}
         {mensagem.texto && (
           <div className={`mb-6 p-4 rounded-xl flex items-center shadow-lg animate-slideIn ${
@@ -412,15 +338,6 @@ const Vendas = () => {
                 </svg>
                 Upload CSV
               </button>
-              <button
-                onClick={() => abrirModal()}
-                className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition-all transform hover:scale-105 shadow-lg flex items-center"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                Nova Venda
-              </button>
             </div>
           </div>
         </div>
@@ -496,15 +413,6 @@ const Vendas = () => {
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(venda.id)}
-                          className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                          title="Excluir"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                           </svg>
                         </button>
                       </div>
