@@ -10,7 +10,7 @@ DROP VIEW IF EXISTS vendas_ativas;
 -- PASSO 2: DROPAR TABELAS (com CASCADE para remover índices/constraints)
 -- ============================================
 DROP TABLE IF EXISTS vendas CASCADE;
-DROP TABLE IF EXISTS usuarios CASCADE;
+-- DROP TABLE IF EXISTS usuarios CASCADE;
 
 -- ============================================
 -- PASSO 3: CRIAR TABELAS DO ZERO
