@@ -37,6 +37,8 @@ const Header = () => {
             </div>
           </div>
 
+          {/* Menu Desktop */}
+          <div className="hidden md:flex items-center space-x-6">
             {/* Perfil Dropdown */}
             <div className="relative">
               <button
