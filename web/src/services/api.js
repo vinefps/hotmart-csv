@@ -43,13 +43,9 @@ api.interceptors.response.use(
 export const authService = {
   login: async (email, senha) => {
     const response = await api.post('/auth/login', { email, senha });
-    return response.data;
-  },
-  verificarToken: async () => {
-    const response = await api.get('/auth/verificar');
-    return response.data;
+    return response.data.data;  // ✅ Retorna apenas { token, usuario }
   }
-};
+}
 
 // ========================================
 // SERVIÇOS DE VENDAS
@@ -59,7 +55,7 @@ export const vendasService = {
   listar: async (page = 1, limit = 20, search = '', status = null) => {
     const params = { page, limit, search };
     if (status) params.status = status;
-    
+
     const response = await api.get('/vendas', { params });
     return response.data;
   },
