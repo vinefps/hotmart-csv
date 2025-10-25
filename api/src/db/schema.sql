@@ -28,7 +28,7 @@ CREATE TABLE usuarios (
 COMMENT ON TABLE usuarios IS 'Tabela de usuários com autenticação do sistema';
 COMMENT ON COLUMN usuarios.id IS 'ID único do usuário';
 COMMENT ON COLUMN usuarios.email IS 'Email único para login';
-COMMENT ON COLUMN usuarios.senha IS 'Senha hasheada (bcrypt)';
+COMMENT ON COLUMN usuarios.senha IS 'Senha (sem criptografia no momento)';
 
 -- Tabela principal de vendas com PRODUTO e STATUS
 CREATE TABLE vendas (
@@ -139,10 +139,9 @@ COMMENT ON VIEW vendas_resumo_status IS 'Resumo de vendas agrupadas por status';
 -- ============================================
 
 -- Inserir usuário padrão
--- ⚠️ IMPORTANTE: Em PRODUÇÃO, usar senha hasheada!
--- Hash válido para senha: admin123
+-- ⚠️ IMPORTANTE: Senha simples (sem bcrypt no momento)
 INSERT INTO usuarios (nome, email, senha) 
-VALUES ('Admin', 'admin@vendas.com', '$2a$10$LQ09Nl8zgewwJKD/IFEyt.rQIT//OeaWT//63T0VxrGhcHQZ4VYWy')
+VALUES ('Admin', 'admin@vendas.com', 'admin123')
 ON CONFLICT (email) DO NOTHING;
 
 -- ============================================

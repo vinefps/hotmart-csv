@@ -1,4 +1,3 @@
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db/connection');
 
@@ -34,10 +33,9 @@ exports.login = async (req, res) => {
 
     const usuario = result.rows[0];
     console.log('✅ Usuário encontrado:', { id: usuario.id, email: usuario.email, nome: usuario.nome });
-    console.log('🔑 Hash armazenado:', usuario.senha ? `${usuario.senha.substring(0, 20)}...` : 'vazio');
 
-    // Verificar senha
-    const senhaValida = await bcrypt.compare(senha, usuario.senha);
+    // ⚠️ COMPARAÇÃO SIMPLES (sem bcrypt)
+    const senhaValida = senha === usuario.senha;
     console.log('🔐 Resultado da comparação:', senhaValida ? '✅ Senha válida' : '❌ Senha inválida');
 
     if (!senhaValida) {
