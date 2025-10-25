@@ -358,6 +358,9 @@ const Vendas = () => {
                     Pagamento
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    Origem
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Valor
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
@@ -392,6 +395,9 @@ const Vendas = () => {
                       <span className="px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">
                         {venda.tipo_pagamento || '-'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{venda.origem_checkout || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-bold text-gray-900">{formatarMoeda(venda.faturamento_liquido)}</div>
